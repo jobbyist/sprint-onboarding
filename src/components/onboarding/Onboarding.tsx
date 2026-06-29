@@ -328,7 +328,7 @@ function Welcome({ onStart }: { onStart: () => void }) {
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background">
       <header className="px-5 pt-5 sm:px-6">
-        <img src={jobbyistLogo} alt="Jobbyist" className="h-6 w-auto dark:invert" />
+        <img src="https://sprint.jobbist.co.za/jobbyistlogoblack.png" width="150px" height="auto" className="h-6 w-auto dark:invert" />
       </header>
       <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center px-5 pb-32 pt-6 text-center sm:px-6">
         <motion.div
@@ -344,7 +344,7 @@ function Welcome({ onStart }: { onStart: () => void }) {
             transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
           />
           <motion.img
-            src={sprintIllustration}
+            src="https://sprint.jobbyist.co.za/sprintbanner.png"
             alt="The 90-Day Job Search Sprint"
             className="relative mx-auto w-72 max-w-full"
             animate={{ y: [0, -8, 0] }}
@@ -366,7 +366,7 @@ function Welcome({ onStart }: { onStart: () => void }) {
           transition={{ delay: 0.3, duration: 0.5 }}
           className="mt-5 text-balance text-4xl font-black leading-[1.05] tracking-tight text-foreground sm:text-5xl"
         >
-          Welcome to the<br />90-Day Job Search Sprint
+          Introducing the<br />90-Day Job Search Sprint
         </motion.h1>
         <motion.p
           initial={{ opacity: 0, y: 16 }}
@@ -1200,8 +1200,8 @@ export function Onboarding() {
       </AnimatePresence>
       {/* Footer brand mark */}
       <div className="mt-10 flex flex-col items-center gap-3 opacity-70">
-        <img src={sprintLogo} alt="The 90-Day Job Search Sprint" className="h-8 w-auto dark:invert" />
-        <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">A Jobbyist programme · South Africa</p>
+        <img src="https://sprint.jobbist.co.za/sprintlogo.png" width="150px" height="auto" alt="The 90-Day Job Search Sprint" className="h-8 w-auto dark:invert" />
+        <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Jobbyist South Africa · All rights reserved</p>
       </div>
     </StepShell>
   );
