@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useInView, useMotionValue, useSpring, useTransform } from "framer-motion";
 import confetti from "canvas-confetti";
+import { useServerFn } from "@tanstack/react-start";
 import jobbyistLogo from "@/assets/jobbyist-logo.png";
 import sprintLogo from "@/assets/sprint-logo.jpeg";
 import sprintIllustration from "@/assets/sprint-illustration.png";
+import { generateSprintAnalysis, type SprintAnalysis } from "@/lib/sprint-analysis.functions";
 
 // ---------- Types ----------
 type Answers = {
@@ -21,6 +23,7 @@ type Answers = {
   lastName?: string;
   email?: string;
   password?: string;
+  analysis?: SprintAnalysis;
 };
 
 const DEFAULT_ANSWERS: Answers = {
@@ -164,7 +167,7 @@ function PrimaryButton({
       }}
       disabled={disabled}
       whileTap={{ scale: 0.97 }}
-      className="inline-flex w-full min-h-12 items-center justify-center gap-2 rounded-full bg-gradient-to-br from-primary to-primary-glow px-6 py-4 text-base font-bold text-primary-foreground shadow-[0_10px_30px_-12px_color-mix(in_oklab,var(--color-primary)_60%,transparent)] transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-40"
+      className="inline-flex w-full min-h-12 items-center justify-center gap-2 rounded-full bg-gradient-to-br from-primary to-primary-glow px-6 py-4 text-base font-bold text-primary-foreground shadow-[0_10px_30px_-12px_color-mix(in_oklab,var(--color-primary)_60%,transparent)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-40"
     >
       {children}
     </motion.button>
@@ -195,10 +198,12 @@ function OptionCard({
   return (
     <motion.button
       type="button"
+      role={multi ? "checkbox" : "radio"}
+      aria-checked={active}
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
       className={[
-        "group flex w-full items-center gap-3 rounded-2xl border-2 px-4 py-4 text-left text-[15px] font-semibold transition",
+        "group flex w-full items-center gap-3 rounded-2xl border-2 px-4 py-4 text-left text-[15px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         active
           ? "border-primary bg-primary-soft text-foreground shadow-[0_8px_24px_-12px_color-mix(in_oklab,var(--color-primary)_55%,transparent)]"
           : "border-border bg-card text-foreground/85 hover:border-primary/40 hover:bg-muted/40",
@@ -328,7 +333,7 @@ function Welcome({ onStart }: { onStart: () => void }) {
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background">
       <header className="px-5 pt-5 sm:px-6">
-        <img src="https://sprint.jobbist.co.za/jobbyistlogoblack.png" width="150px" height="auto" className="h-6 w-auto dark:invert" />
+        <img src="https://sprint.jobbyist.co.za/jobbyistlogoblack.png" width="150px" height="auto" className="h-6 w-auto dark:invert" />
       </header>
       <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center px-5 pb-32 pt-6 text-center sm:px-6">
         <motion.div
@@ -399,81 +404,164 @@ function Welcome({ onStart }: { onStart: () => void }) {
 }
 
 // ---------- AI Personalising ----------
-function AIPersonalising({ onDone }: { onDone: () => void }) {
+function AIPersonalising({ answers, onDone }: { answers: Answers; onDone: (a: SprintAnalysis) => void }) {
   const messages = useMemo(
     () => [
       "Analysing your responses",
-      "Building your personalised Sprint",
+      "Consulting South African market data",
       "Tailoring your action plan",
       "Preparing recommendations",
     ],
     []
   );
   const [completed, setCompleted] = useState(0);
+  const [analysis, setAnalysis] = useState<SprintAnalysis | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const analyse = useServerFn(generateSprintAnalysis);
 
+  // Step progress
   useEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = [];
     messages.forEach((_, i) => {
       timers.push(setTimeout(() => setCompleted(i + 1), 900 * (i + 1)));
     });
-    timers.push(setTimeout(onDone, 900 * (messages.length + 1)));
     return () => timers.forEach(clearTimeout);
-  }, [messages, onDone]);
+  }, [messages]);
+
+  // Fetch Gemini analysis in parallel
+  useEffect(() => {
+    let cancelled = false;
+    analyse({
+      data: {
+        profile: answers.profile,
+        duration: answers.duration,
+        appsPerWeek: answers.appsPerWeek,
+        interviews: answers.interviews,
+        challenges: answers.challenges,
+        industries: answers.industries,
+        location: answers.location,
+        salary: answers.salary,
+        commitment: answers.commitment,
+        goals: answers.goals,
+      },
+    })
+      .then((res) => { if (!cancelled) setAnalysis(res); })
+      .catch((e) => { if (!cancelled) { console.error(e); setError("We couldn't reach the analyser — showing a default plan."); } });
+    return () => { cancelled = true; };
+  }, [analyse, answers]);
+
+  const stepsDone = completed >= messages.length;
+  const canReveal = stepsDone && (analysis || error);
 
   return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
-      <div className="relative mb-8 grid h-32 w-32 place-items-center">
+    <div className="flex min-h-[70vh] flex-col items-center justify-center text-center">
+      {!canReveal && (
+        <>
+          <div className="relative mb-8 grid h-32 w-32 place-items-center">
+            <div className="absolute inset-0 rounded-full border-4 border-primary/15" />
+            <motion.div
+              className="absolute inset-0 rounded-full border-4 border-transparent border-t-primary border-r-primary-glow"
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1.6, repeat: Infinity, ease: "linear" }}
+              aria-hidden
+            />
+            <motion.div
+              className="absolute inset-3 rounded-full border-2 border-transparent border-b-primary/60"
+              animate={{ rotate: -360 }}
+              transition={{ duration: 2.4, repeat: Infinity, ease: "linear" }}
+              aria-hidden
+            />
+            <div className="relative text-3xl" aria-hidden>🤖</div>
+          </div>
+          <h2 className="mb-2 text-2xl font-extrabold tracking-tight">Personalising your Sprint</h2>
+          <p className="mb-8 text-sm text-muted-foreground" role="status" aria-live="polite">
+            Our AI is analysing your goals and crafting your roadmap…
+          </p>
+          <ul className="w-full max-w-sm space-y-2.5">
+            {messages.map((m, i) => {
+              const done = completed > i;
+              const active = completed === i;
+              return (
+                <li
+                  key={m}
+                  className={[
+                    "flex items-center gap-3 rounded-2xl border px-4 py-3 text-left text-sm font-semibold",
+                    done ? "border-success/40 bg-success/10 text-foreground" :
+                    active ? "border-primary/40 bg-primary-soft text-foreground" :
+                    "border-border text-muted-foreground",
+                  ].join(" ")}
+                >
+                  <span className={[
+                    "grid h-6 w-6 shrink-0 place-items-center rounded-full",
+                    done ? "bg-success text-white" :
+                    active ? "bg-primary/15 text-primary" :
+                    "bg-muted text-muted-foreground",
+                  ].join(" ")}>
+                    {done ? (
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M20 6 9 17l-5-5"/></svg>
+                    ) : active ? (
+                      <motion.span className="block h-2 w-2 rounded-full bg-primary" animate={{ scale: [1, 1.4, 1] }} transition={{ duration: 1, repeat: Infinity }} aria-hidden />
+                    ) : null}
+                  </span>
+                  {m}
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
+
+      {canReveal && (
         <motion.div
-          className="absolute inset-0 rounded-full border-4 border-primary/15"
-        />
-        <motion.div
-          className="absolute inset-0 rounded-full border-4 border-transparent border-t-primary border-r-primary-glow"
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1.6, repeat: Infinity, ease: "linear" }}
-        />
-        <motion.div
-          className="absolute inset-3 rounded-full border-2 border-transparent border-b-primary/60"
-          animate={{ rotate: -360 }}
-          transition={{ duration: 2.4, repeat: Infinity, ease: "linear" }}
-        />
-        <div className="relative text-3xl">🤖</div>
-      </div>
-      <h2 className="mb-2 text-2xl font-extrabold tracking-tight">Personalising your Sprint</h2>
-      <p className="mb-8 text-sm text-muted-foreground">Our AI is analysing your goals and crafting your roadmap…</p>
-      <ul className="w-full max-w-sm space-y-2.5">
-        {messages.map((m, i) => {
-          const done = completed > i;
-          const active = completed === i;
-          return (
-            <motion.li
-              key={m}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.1 }}
-              className={[
-                "flex items-center gap-3 rounded-2xl border px-4 py-3 text-left text-sm font-semibold",
-                done ? "border-success/40 bg-success/10 text-foreground" :
-                active ? "border-primary/40 bg-primary-soft text-foreground" :
-                "border-border text-muted-foreground",
-              ].join(" ")}
-            >
-              <span className={[
-                "grid h-6 w-6 shrink-0 place-items-center rounded-full",
-                done ? "bg-success text-white" :
-                active ? "bg-primary/15 text-primary" :
-                "bg-muted text-muted-foreground",
-              ].join(" ")}>
-                {done ? (
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-                ) : active ? (
-                  <motion.span className="block h-2 w-2 rounded-full bg-primary" animate={{ scale: [1, 1.4, 1] }} transition={{ duration: 1, repeat: Infinity }} />
-                ) : null}
-              </span>
-              {m}
-            </motion.li>
-          );
-        })}
-      </ul>
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="w-full max-w-lg text-left"
+        >
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary-soft px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-primary">
+            <span aria-hidden>✨</span> Your personalised analysis
+          </div>
+          <h2 className="text-balance text-3xl font-black leading-tight tracking-tight sm:text-4xl">
+            {analysis?.headline ?? "Your Sprint plan is ready"}
+          </h2>
+
+          <div className="mt-6 space-y-4">
+            <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-primary">Your strengths</h3>
+              <ul className="mt-2 space-y-1.5">
+                {(analysis?.strengths ?? []).map((s) => (
+                  <li key={s} className="flex items-start gap-2 text-sm">
+                    <span aria-hidden className="mt-0.5 text-success">✓</span>
+                    <span>{s}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+
+            <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-primary">Priority focus areas</h3>
+              <ol className="mt-2 space-y-1.5">
+                {(analysis?.focusAreas ?? []).map((s, i) => (
+                  <li key={s} className="flex items-start gap-2 text-sm">
+                    <span aria-hidden className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-black text-primary-foreground">{i + 1}</span>
+                    <span>{s}</span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+
+            <section className="rounded-2xl border border-primary/30 bg-primary-soft p-4">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-primary">Your weekly target</h3>
+              <p className="mt-1.5 text-sm font-semibold text-foreground">{analysis?.weeklyTarget}</p>
+            </section>
+
+            <p className="text-sm leading-relaxed text-muted-foreground">{analysis?.outlook}</p>
+            {error && <p className="text-xs text-warning" role="alert">{error}</p>}
+          </div>
+
+          <StickyCTA><PrimaryButton onClick={() => analysis && onDone(analysis)}>See what you're up against</PrimaryButton></StickyCTA>
+        </motion.div>
+      )}
     </div>
   );
 }
@@ -790,7 +878,7 @@ function Account({
         <div className="grid grid-cols-2 gap-3">
           <FormField label="First name" required>
             <input
-              className="w-full rounded-xl border border-border bg-background px-3 py-3 text-[15px] outline-none focus:border-primary"
+              className="w-full rounded-xl border border-border bg-background px-3 py-3 text-[15px] outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary/40"
               value={answers.firstName ?? ""}
               onChange={(e) => setAnswers({ ...answers, firstName: e.target.value })}
               autoComplete="given-name"
@@ -798,7 +886,7 @@ function Account({
           </FormField>
           <FormField label="Last name" required>
             <input
-              className="w-full rounded-xl border border-border bg-background px-3 py-3 text-[15px] outline-none focus:border-primary"
+              className="w-full rounded-xl border border-border bg-background px-3 py-3 text-[15px] outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary/40"
               value={answers.lastName ?? ""}
               onChange={(e) => setAnswers({ ...answers, lastName: e.target.value })}
               autoComplete="family-name"
@@ -808,7 +896,7 @@ function Account({
         <FormField label="Email" required error={touched && !!answers.email && !/\S+@\S+\.\S+/.test(answers.email) ? "Enter a valid email" : undefined}>
           <input
             type="email"
-            className="w-full rounded-xl border border-border bg-background px-3 py-3 text-[15px] outline-none focus:border-primary"
+            className="w-full rounded-xl border border-border bg-background px-3 py-3 text-[15px] outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary/40"
             value={answers.email ?? ""}
             onChange={(e) => setAnswers({ ...answers, email: e.target.value })}
             autoComplete="email"
@@ -817,7 +905,7 @@ function Account({
         <FormField label="Password" required hint="Minimum 8 characters">
           <input
             type="password"
-            className="w-full rounded-xl border border-border bg-background px-3 py-3 text-[15px] outline-none focus:border-primary"
+            className="w-full rounded-xl border border-border bg-background px-3 py-3 text-[15px] outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary/40"
             value={answers.password ?? ""}
             onChange={(e) => setAnswers({ ...answers, password: e.target.value })}
             autoComplete="new-password"
@@ -843,30 +931,125 @@ function FormField({ label, children, required, hint, error }: { label: string; 
 }
 
 // ---------- Payment ----------
-function Payment({ onPay }: { onPay: () => void }) {
+const PAYMENT_LOCK_KEY = "jobbyist_sprint_payment_locks_v1";
+const PAYMENT_TIMER_KEY = "jobbyist_sprint_payment_timer_v1";
+const PAYMENT_WINDOW_MS = 10 * 60 * 1000;
+
+function readLocks(): Record<string, number> {
+  try { return JSON.parse(localStorage.getItem(PAYMENT_LOCK_KEY) || "{}"); } catch { return {}; }
+}
+
+function Payment({ email, onPay, onExpire }: { email?: string; onPay: () => void; onExpire: () => void }) {
+  const lockedEmail = useMemo(() => {
+    if (!email) return false;
+    return Boolean(readLocks()[email.toLowerCase()]);
+  }, [email]);
+
+  // Timer state
+  const deadlineRef = useRef<number>(0);
+  const [remaining, setRemaining] = useState<number>(PAYMENT_WINDOW_MS);
+  const [expired, setExpired] = useState(false);
+
+  useEffect(() => {
+    if (lockedEmail) { setExpired(true); return; }
+    let stored = 0;
+    try { stored = Number(sessionStorage.getItem(PAYMENT_TIMER_KEY) || 0); } catch { /* ignore */ }
+    const now = Date.now();
+    if (!stored || stored < now) {
+      stored = now + PAYMENT_WINDOW_MS;
+      try { sessionStorage.setItem(PAYMENT_TIMER_KEY, String(stored)); } catch { /* ignore */ }
+    }
+    deadlineRef.current = stored;
+    const tick = () => {
+      const left = deadlineRef.current - Date.now();
+      if (left <= 0) {
+        setRemaining(0);
+        setExpired(true);
+        if (email) {
+          const locks = readLocks();
+          locks[email.toLowerCase()] = Date.now();
+          try { localStorage.setItem(PAYMENT_LOCK_KEY, JSON.stringify(locks)); } catch { /* ignore */ }
+        }
+        try { sessionStorage.removeItem(PAYMENT_TIMER_KEY); } catch { /* ignore */ }
+        return;
+      }
+      setRemaining(left);
+    };
+    tick();
+    const id = setInterval(tick, 500);
+    return () => clearInterval(id);
+  }, [email, lockedEmail]);
+
+  const mins = Math.floor(remaining / 60000);
+  const secs = Math.floor((remaining % 60000) / 1000);
+  const urgent = remaining < 2 * 60 * 1000;
+
+  if (expired) {
+    return (
+      <>
+        <QuestionHeader kicker="Session expired" title="Your 50% offer has expired" subtitle="For fairness, this discount is one-time per email. Please sign up with a different email address to try again." />
+        <div className="rounded-3xl border border-destructive/30 bg-destructive/5 p-5 text-sm">
+          <p className="font-semibold text-destructive">The 10-minute checkout window has ended.</p>
+          <p className="mt-2 text-muted-foreground">
+            {email ? <>The email <strong className="text-foreground">{email}</strong> can no longer be used for this promotional price.</> : "Please start again to lock in your Sprint."}
+          </p>
+        </div>
+        <StickyCTA>
+          <PrimaryButton onClick={onExpire}>Sign up with a different email</PrimaryButton>
+        </StickyCTA>
+      </>
+    );
+  }
+
+  const handlePay = () => {
+    // TODO: integrate PayPal once credentials are provided.
+    try { sessionStorage.removeItem(PAYMENT_TIMER_KEY); } catch { /* ignore */ }
+    onPay();
+  };
+
   return (
     <>
-      <QuestionHeader kicker="Checkout" title="Unlock your Sprint" subtitle="Cancel anytime. 14-day money-back guarantee." />
+      <QuestionHeader kicker="Checkout" title="Unlock your Sprint" subtitle="Cancel anytime · 30-day money-back guarantee." />
+
+      <div
+        role="timer"
+        aria-live="polite"
+        aria-label={`Offer expires in ${mins} minutes and ${secs} seconds`}
+        className={[
+          "mb-4 flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-sm font-bold shadow-sm",
+          urgent ? "border-destructive/40 bg-destructive/10 text-destructive" : "border-primary/30 bg-primary-soft text-primary",
+        ].join(" ")}
+      >
+        <span className="inline-flex items-center gap-2">
+          <span aria-hidden>⏳</span>
+          <span>{urgent ? "Hurry — offer ending soon" : "Your 50% price is reserved for"}</span>
+        </span>
+        <span className="tabular-nums text-lg font-black tracking-tight">
+          {String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}
+        </span>
+      </div>
+
       <div className="rounded-3xl border border-border bg-card p-5 shadow-sm">
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-[11px] font-bold uppercase tracking-wider text-primary">Jobbyist Pro</div>
             <div className="mt-0.5 text-lg font-extrabold tracking-tight">3-Month Sprint Bundle</div>
+            <div className="mt-1 text-[11px] text-muted-foreground">Standard price R99/month · billed as R297 for 3 months</div>
           </div>
           <span className="rounded-full bg-gradient-to-r from-rose-500 to-orange-500 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-white">50% OFF</span>
         </div>
         <div className="mt-4 space-y-2 text-sm">
-          <Row label="Jobbyist Pro (3 months)" value={<><span className="text-muted-foreground line-through mr-2">R897</span><span className="font-bold">R448.50</span></>} />
+          <Row label="Jobbyist Pro (3 months)" value={<><span className="text-muted-foreground line-through mr-2">R297</span><span className="font-bold">R148.50</span></>} />
           <Row label="90-Day Sprint programme" value={<span className="font-bold text-success">Included free</span>} />
           <Row label="Sprint Service Handbook" value={<span className="font-bold text-success">Included</span>} />
           <div className="my-2 h-px bg-border" />
-          <Row label="You save" value={<span className="font-bold text-success">R448.50</span>} />
-          <Row label={<span className="text-base font-extrabold text-foreground">Total today</span>} value={<span className="text-base font-black tracking-tight">R448.50</span>} />
+          <Row label="You save" value={<span className="font-bold text-success">R148.50</span>} />
+          <Row label={<span className="text-base font-extrabold text-foreground">Total today</span>} value={<span className="text-base font-black tracking-tight">R148.50</span>} />
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] font-bold text-muted-foreground">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/40 px-2.5 py-1">🔒 256-bit SSL</span>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/40 px-2.5 py-1">💳 Visa · Mastercard</span>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/40 px-2.5 py-1">↩️ 14-day refund</span>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/40 px-2.5 py-1">💳 PayPal · Visa · Mastercard</span>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/40 px-2.5 py-1">↩️ 30-day refund</span>
         </div>
       </div>
 
@@ -875,15 +1058,15 @@ function Payment({ onPay }: { onPay: () => void }) {
           <strong className="text-foreground">Jobbyist is not a recruitment agency</strong> and does not place candidates or guarantee employment outcomes. Outcomes depend on market conditions, employer decisions, and your own engagement.
         </p>
         <p className="mt-2">
-          <a href="https://sprint.jobbyist.co.za/sprint.pdf" target="_blank" rel="noreferrer" className="font-bold text-primary underline underline-offset-2">
+          <a href="https://sprint.jobbyist.co.za/sprint.pdf" target="_blank" rel="noreferrer" className="font-bold text-primary underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded">
             Read the Service Handbook (PDF)
           </a>
         </p>
       </div>
 
       <StickyCTA>
-        <PrimaryButton onClick={onPay}>Unlock My Sprint — R448.50</PrimaryButton>
-        <p className="mt-2 text-center text-[11px] text-muted-foreground">Secure checkout · Cancel anytime</p>
+        <PrimaryButton onClick={handlePay}>Unlock My Sprint — R148.50</PrimaryButton>
+        <p className="mt-2 text-center text-[11px] text-muted-foreground">Secure PayPal checkout · Cancel anytime · 30-day money back</p>
       </StickyCTA>
     </>
   );
@@ -1188,19 +1371,19 @@ export function Onboarding() {
               <StickyCTA><PrimaryButton onClick={next} disabled={answers.goals.length === 0}>Build my Sprint</PrimaryButton></StickyCTA>
             </>
           )}
-          {stepId === "ai-personalising" && <AIPersonalising onDone={next} />}
+          {stepId === "ai-personalising" && <AIPersonalising answers={answers} onDone={(a) => { setAnswers((prev) => ({ ...prev, analysis: a })); next(); }} />}
           {stepId === "labour-market" && <LabourMarket onNext={next} />}
           {stepId === "methodology" && <Methodology onNext={next} />}
           {stepId === "motivation" && <Motivation onNext={next} />}
           {stepId === "offer" && <Offer onNext={next} />}
           {stepId === "social-proof" && <SocialProof onNext={next} />}
           {stepId === "account" && <Account answers={answers} setAnswers={setAnswers} onNext={next} />}
-          {stepId === "payment" && <Payment onPay={next} />}
+          {stepId === "payment" && <Payment email={answers.email} onExpire={() => { setAnswers({ ...DEFAULT_ANSWERS }); setIndex(STEPS.indexOf("account")); }} onPay={next} />}
         </motion.div>
       </AnimatePresence>
       {/* Footer brand mark */}
       <div className="mt-10 flex flex-col items-center gap-3 opacity-70">
-        <img src="https://sprint.jobbist.co.za/sprintlogo.png" width="150px" height="auto" alt="The 90-Day Job Search Sprint" className="h-8 w-auto dark:invert" />
+        <img src="https://sprint.jobbyist.co.za/sprintlogo.png" width="150px" height="auto" alt="The 90-Day Job Search Sprint" className="h-8 w-auto dark:invert" />
         <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Jobbyist South Africa · All rights reserved</p>
       </div>
     </StepShell>
