@@ -929,30 +929,125 @@ function FormField({ label, children, required, hint, error }: { label: string; 
 }
 
 // ---------- Payment ----------
-function Payment({ onPay }: { onPay: () => void }) {
+const PAYMENT_LOCK_KEY = "jobbyist_sprint_payment_locks_v1";
+const PAYMENT_TIMER_KEY = "jobbyist_sprint_payment_timer_v1";
+const PAYMENT_WINDOW_MS = 10 * 60 * 1000;
+
+function readLocks(): Record<string, number> {
+  try { return JSON.parse(localStorage.getItem(PAYMENT_LOCK_KEY) || "{}"); } catch { return {}; }
+}
+
+function Payment({ email, onPay, onExpire }: { email?: string; onPay: () => void; onExpire: () => void }) {
+  const lockedEmail = useMemo(() => {
+    if (!email) return false;
+    return Boolean(readLocks()[email.toLowerCase()]);
+  }, [email]);
+
+  // Timer state
+  const deadlineRef = useRef<number>(0);
+  const [remaining, setRemaining] = useState<number>(PAYMENT_WINDOW_MS);
+  const [expired, setExpired] = useState(false);
+
+  useEffect(() => {
+    if (lockedEmail) { setExpired(true); return; }
+    let stored = 0;
+    try { stored = Number(sessionStorage.getItem(PAYMENT_TIMER_KEY) || 0); } catch { /* ignore */ }
+    const now = Date.now();
+    if (!stored || stored < now) {
+      stored = now + PAYMENT_WINDOW_MS;
+      try { sessionStorage.setItem(PAYMENT_TIMER_KEY, String(stored)); } catch { /* ignore */ }
+    }
+    deadlineRef.current = stored;
+    const tick = () => {
+      const left = deadlineRef.current - Date.now();
+      if (left <= 0) {
+        setRemaining(0);
+        setExpired(true);
+        if (email) {
+          const locks = readLocks();
+          locks[email.toLowerCase()] = Date.now();
+          try { localStorage.setItem(PAYMENT_LOCK_KEY, JSON.stringify(locks)); } catch { /* ignore */ }
+        }
+        try { sessionStorage.removeItem(PAYMENT_TIMER_KEY); } catch { /* ignore */ }
+        return;
+      }
+      setRemaining(left);
+    };
+    tick();
+    const id = setInterval(tick, 500);
+    return () => clearInterval(id);
+  }, [email, lockedEmail]);
+
+  const mins = Math.floor(remaining / 60000);
+  const secs = Math.floor((remaining % 60000) / 1000);
+  const urgent = remaining < 2 * 60 * 1000;
+
+  if (expired) {
+    return (
+      <>
+        <QuestionHeader kicker="Session expired" title="Your 50% offer has expired" subtitle="For fairness, this discount is one-time per email. Please sign up with a different email address to try again." />
+        <div className="rounded-3xl border border-destructive/30 bg-destructive/5 p-5 text-sm">
+          <p className="font-semibold text-destructive">The 10-minute checkout window has ended.</p>
+          <p className="mt-2 text-muted-foreground">
+            {email ? <>The email <strong className="text-foreground">{email}</strong> can no longer be used for this promotional price.</> : "Please start again to lock in your Sprint."}
+          </p>
+        </div>
+        <StickyCTA>
+          <PrimaryButton onClick={onExpire}>Sign up with a different email</PrimaryButton>
+        </StickyCTA>
+      </>
+    );
+  }
+
+  const handlePay = () => {
+    // TODO: integrate PayPal once credentials are provided.
+    try { sessionStorage.removeItem(PAYMENT_TIMER_KEY); } catch { /* ignore */ }
+    onPay();
+  };
+
   return (
     <>
-      <QuestionHeader kicker="Checkout" title="Unlock your Sprint" subtitle="Cancel anytime. 14-day money-back guarantee." />
+      <QuestionHeader kicker="Checkout" title="Unlock your Sprint" subtitle="Cancel anytime · 30-day money-back guarantee." />
+
+      <div
+        role="timer"
+        aria-live="polite"
+        aria-label={`Offer expires in ${mins} minutes and ${secs} seconds`}
+        className={[
+          "mb-4 flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-sm font-bold shadow-sm",
+          urgent ? "border-destructive/40 bg-destructive/10 text-destructive" : "border-primary/30 bg-primary-soft text-primary",
+        ].join(" ")}
+      >
+        <span className="inline-flex items-center gap-2">
+          <span aria-hidden>⏳</span>
+          <span>{urgent ? "Hurry — offer ending soon" : "Your 50% price is reserved for"}</span>
+        </span>
+        <span className="tabular-nums text-lg font-black tracking-tight">
+          {String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}
+        </span>
+      </div>
+
       <div className="rounded-3xl border border-border bg-card p-5 shadow-sm">
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-[11px] font-bold uppercase tracking-wider text-primary">Jobbyist Pro</div>
             <div className="mt-0.5 text-lg font-extrabold tracking-tight">3-Month Sprint Bundle</div>
+            <div className="mt-1 text-[11px] text-muted-foreground">Standard price R99/month · billed as R297 for 3 months</div>
           </div>
           <span className="rounded-full bg-gradient-to-r from-rose-500 to-orange-500 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-white">50% OFF</span>
         </div>
         <div className="mt-4 space-y-2 text-sm">
-          <Row label="Jobbyist Pro (3 months)" value={<><span className="text-muted-foreground line-through mr-2">R897</span><span className="font-bold">R448.50</span></>} />
+          <Row label="Jobbyist Pro (3 months)" value={<><span className="text-muted-foreground line-through mr-2">R297</span><span className="font-bold">R148.50</span></>} />
           <Row label="90-Day Sprint programme" value={<span className="font-bold text-success">Included free</span>} />
           <Row label="Sprint Service Handbook" value={<span className="font-bold text-success">Included</span>} />
           <div className="my-2 h-px bg-border" />
-          <Row label="You save" value={<span className="font-bold text-success">R448.50</span>} />
-          <Row label={<span className="text-base font-extrabold text-foreground">Total today</span>} value={<span className="text-base font-black tracking-tight">R448.50</span>} />
+          <Row label="You save" value={<span className="font-bold text-success">R148.50</span>} />
+          <Row label={<span className="text-base font-extrabold text-foreground">Total today</span>} value={<span className="text-base font-black tracking-tight">R148.50</span>} />
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] font-bold text-muted-foreground">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/40 px-2.5 py-1">🔒 256-bit SSL</span>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/40 px-2.5 py-1">💳 Visa · Mastercard</span>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/40 px-2.5 py-1">↩️ 14-day refund</span>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/40 px-2.5 py-1">💳 PayPal · Visa · Mastercard</span>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/40 px-2.5 py-1">↩️ 30-day refund</span>
         </div>
       </div>
 
@@ -961,15 +1056,15 @@ function Payment({ onPay }: { onPay: () => void }) {
           <strong className="text-foreground">Jobbyist is not a recruitment agency</strong> and does not place candidates or guarantee employment outcomes. Outcomes depend on market conditions, employer decisions, and your own engagement.
         </p>
         <p className="mt-2">
-          <a href="https://sprint.jobbyist.co.za/sprint.pdf" target="_blank" rel="noreferrer" className="font-bold text-primary underline underline-offset-2">
+          <a href="https://sprint.jobbyist.co.za/sprint.pdf" target="_blank" rel="noreferrer" className="font-bold text-primary underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded">
             Read the Service Handbook (PDF)
           </a>
         </p>
       </div>
 
       <StickyCTA>
-        <PrimaryButton onClick={onPay}>Unlock My Sprint — R448.50</PrimaryButton>
-        <p className="mt-2 text-center text-[11px] text-muted-foreground">Secure checkout · Cancel anytime</p>
+        <PrimaryButton onClick={handlePay}>Unlock My Sprint — R148.50</PrimaryButton>
+        <p className="mt-2 text-center text-[11px] text-muted-foreground">Secure PayPal checkout · Cancel anytime · 30-day money back</p>
       </StickyCTA>
     </>
   );
