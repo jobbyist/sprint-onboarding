@@ -198,10 +198,12 @@ function OptionCard({
   return (
     <motion.button
       type="button"
+      role={multi ? "checkbox" : "radio"}
+      aria-checked={active}
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
       className={[
-        "group flex w-full items-center gap-3 rounded-2xl border-2 px-4 py-4 text-left text-[15px] font-semibold transition",
+        "group flex w-full items-center gap-3 rounded-2xl border-2 px-4 py-4 text-left text-[15px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         active
           ? "border-primary bg-primary-soft text-foreground shadow-[0_8px_24px_-12px_color-mix(in_oklab,var(--color-primary)_55%,transparent)]"
           : "border-border bg-card text-foreground/85 hover:border-primary/40 hover:bg-muted/40",
