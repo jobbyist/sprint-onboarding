@@ -401,81 +401,164 @@ function Welcome({ onStart }: { onStart: () => void }) {
 }
 
 // ---------- AI Personalising ----------
-function AIPersonalising({ onDone }: { onDone: () => void }) {
+function AIPersonalising({ answers, onDone }: { answers: Answers; onDone: (a: SprintAnalysis) => void }) {
   const messages = useMemo(
     () => [
       "Analysing your responses",
-      "Building your personalised Sprint",
+      "Consulting South African market data",
       "Tailoring your action plan",
       "Preparing recommendations",
     ],
     []
   );
   const [completed, setCompleted] = useState(0);
+  const [analysis, setAnalysis] = useState<SprintAnalysis | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const analyse = useServerFn(generateSprintAnalysis);
 
+  // Step progress
   useEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = [];
     messages.forEach((_, i) => {
       timers.push(setTimeout(() => setCompleted(i + 1), 900 * (i + 1)));
     });
-    timers.push(setTimeout(onDone, 900 * (messages.length + 1)));
     return () => timers.forEach(clearTimeout);
-  }, [messages, onDone]);
+  }, [messages]);
+
+  // Fetch Gemini analysis in parallel
+  useEffect(() => {
+    let cancelled = false;
+    analyse({
+      data: {
+        profile: answers.profile,
+        duration: answers.duration,
+        appsPerWeek: answers.appsPerWeek,
+        interviews: answers.interviews,
+        challenges: answers.challenges,
+        industries: answers.industries,
+        location: answers.location,
+        salary: answers.salary,
+        commitment: answers.commitment,
+        goals: answers.goals,
+      },
+    })
+      .then((res) => { if (!cancelled) setAnalysis(res); })
+      .catch((e) => { if (!cancelled) { console.error(e); setError("We couldn't reach the analyser — showing a default plan."); } });
+    return () => { cancelled = true; };
+  }, [analyse, answers]);
+
+  const stepsDone = completed >= messages.length;
+  const canReveal = stepsDone && (analysis || error);
 
   return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
-      <div className="relative mb-8 grid h-32 w-32 place-items-center">
+    <div className="flex min-h-[70vh] flex-col items-center justify-center text-center">
+      {!canReveal && (
+        <>
+          <div className="relative mb-8 grid h-32 w-32 place-items-center">
+            <div className="absolute inset-0 rounded-full border-4 border-primary/15" />
+            <motion.div
+              className="absolute inset-0 rounded-full border-4 border-transparent border-t-primary border-r-primary-glow"
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1.6, repeat: Infinity, ease: "linear" }}
+              aria-hidden
+            />
+            <motion.div
+              className="absolute inset-3 rounded-full border-2 border-transparent border-b-primary/60"
+              animate={{ rotate: -360 }}
+              transition={{ duration: 2.4, repeat: Infinity, ease: "linear" }}
+              aria-hidden
+            />
+            <div className="relative text-3xl" aria-hidden>🤖</div>
+          </div>
+          <h2 className="mb-2 text-2xl font-extrabold tracking-tight">Personalising your Sprint</h2>
+          <p className="mb-8 text-sm text-muted-foreground" role="status" aria-live="polite">
+            Our AI is analysing your goals and crafting your roadmap…
+          </p>
+          <ul className="w-full max-w-sm space-y-2.5">
+            {messages.map((m, i) => {
+              const done = completed > i;
+              const active = completed === i;
+              return (
+                <li
+                  key={m}
+                  className={[
+                    "flex items-center gap-3 rounded-2xl border px-4 py-3 text-left text-sm font-semibold",
+                    done ? "border-success/40 bg-success/10 text-foreground" :
+                    active ? "border-primary/40 bg-primary-soft text-foreground" :
+                    "border-border text-muted-foreground",
+                  ].join(" ")}
+                >
+                  <span className={[
+                    "grid h-6 w-6 shrink-0 place-items-center rounded-full",
+                    done ? "bg-success text-white" :
+                    active ? "bg-primary/15 text-primary" :
+                    "bg-muted text-muted-foreground",
+                  ].join(" ")}>
+                    {done ? (
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M20 6 9 17l-5-5"/></svg>
+                    ) : active ? (
+                      <motion.span className="block h-2 w-2 rounded-full bg-primary" animate={{ scale: [1, 1.4, 1] }} transition={{ duration: 1, repeat: Infinity }} aria-hidden />
+                    ) : null}
+                  </span>
+                  {m}
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
+
+      {canReveal && (
         <motion.div
-          className="absolute inset-0 rounded-full border-4 border-primary/15"
-        />
-        <motion.div
-          className="absolute inset-0 rounded-full border-4 border-transparent border-t-primary border-r-primary-glow"
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1.6, repeat: Infinity, ease: "linear" }}
-        />
-        <motion.div
-          className="absolute inset-3 rounded-full border-2 border-transparent border-b-primary/60"
-          animate={{ rotate: -360 }}
-          transition={{ duration: 2.4, repeat: Infinity, ease: "linear" }}
-        />
-        <div className="relative text-3xl">🤖</div>
-      </div>
-      <h2 className="mb-2 text-2xl font-extrabold tracking-tight">Personalising your Sprint</h2>
-      <p className="mb-8 text-sm text-muted-foreground">Our AI is analysing your goals and crafting your roadmap…</p>
-      <ul className="w-full max-w-sm space-y-2.5">
-        {messages.map((m, i) => {
-          const done = completed > i;
-          const active = completed === i;
-          return (
-            <motion.li
-              key={m}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.1 }}
-              className={[
-                "flex items-center gap-3 rounded-2xl border px-4 py-3 text-left text-sm font-semibold",
-                done ? "border-success/40 bg-success/10 text-foreground" :
-                active ? "border-primary/40 bg-primary-soft text-foreground" :
-                "border-border text-muted-foreground",
-              ].join(" ")}
-            >
-              <span className={[
-                "grid h-6 w-6 shrink-0 place-items-center rounded-full",
-                done ? "bg-success text-white" :
-                active ? "bg-primary/15 text-primary" :
-                "bg-muted text-muted-foreground",
-              ].join(" ")}>
-                {done ? (
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-                ) : active ? (
-                  <motion.span className="block h-2 w-2 rounded-full bg-primary" animate={{ scale: [1, 1.4, 1] }} transition={{ duration: 1, repeat: Infinity }} />
-                ) : null}
-              </span>
-              {m}
-            </motion.li>
-          );
-        })}
-      </ul>
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="w-full max-w-lg text-left"
+        >
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary-soft px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-primary">
+            <span aria-hidden>✨</span> Your personalised analysis
+          </div>
+          <h2 className="text-balance text-3xl font-black leading-tight tracking-tight sm:text-4xl">
+            {analysis?.headline ?? "Your Sprint plan is ready"}
+          </h2>
+
+          <div className="mt-6 space-y-4">
+            <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-primary">Your strengths</h3>
+              <ul className="mt-2 space-y-1.5">
+                {(analysis?.strengths ?? []).map((s) => (
+                  <li key={s} className="flex items-start gap-2 text-sm">
+                    <span aria-hidden className="mt-0.5 text-success">✓</span>
+                    <span>{s}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+
+            <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-primary">Priority focus areas</h3>
+              <ol className="mt-2 space-y-1.5">
+                {(analysis?.focusAreas ?? []).map((s, i) => (
+                  <li key={s} className="flex items-start gap-2 text-sm">
+                    <span aria-hidden className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-black text-primary-foreground">{i + 1}</span>
+                    <span>{s}</span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+
+            <section className="rounded-2xl border border-primary/30 bg-primary-soft p-4">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-primary">Your weekly target</h3>
+              <p className="mt-1.5 text-sm font-semibold text-foreground">{analysis?.weeklyTarget}</p>
+            </section>
+
+            <p className="text-sm leading-relaxed text-muted-foreground">{analysis?.outlook}</p>
+            {error && <p className="text-xs text-warning" role="alert">{error}</p>}
+          </div>
+
+          <StickyCTA><PrimaryButton onClick={() => analysis && onDone(analysis)}>See what you're up against</PrimaryButton></StickyCTA>
+        </motion.div>
+      )}
     </div>
   );
 }
