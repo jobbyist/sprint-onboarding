@@ -167,7 +167,7 @@ function PrimaryButton({
       }}
       disabled={disabled}
       whileTap={{ scale: 0.97 }}
-      className="inline-flex w-full min-h-12 items-center justify-center gap-2 rounded-full bg-gradient-to-br from-primary to-primary-glow px-6 py-4 text-base font-bold text-primary-foreground shadow-[0_10px_30px_-12px_color-mix(in_oklab,var(--color-primary)_60%,transparent)] transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-40"
+      className="inline-flex w-full min-h-12 items-center justify-center gap-2 rounded-full bg-gradient-to-br from-primary to-primary-glow px-6 py-4 text-base font-bold text-primary-foreground shadow-[0_10px_30px_-12px_color-mix(in_oklab,var(--color-primary)_60%,transparent)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-40"
     >
       {children}
     </motion.button>
