@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useInView, useMotionValue, useSpring, useTransform } from "framer-motion";
 import confetti from "canvas-confetti";
+import { useServerFn } from "@tanstack/react-start";
 import jobbyistLogo from "@/assets/jobbyist-logo.png";
 import sprintLogo from "@/assets/sprint-logo.jpeg";
 import sprintIllustration from "@/assets/sprint-illustration.png";
+import { generateSprintAnalysis, type SprintAnalysis } from "@/lib/sprint-analysis.functions";
 
 // ---------- Types ----------
 type Answers = {
