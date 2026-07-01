@@ -1273,14 +1273,14 @@ export function Onboarding() {
               <StickyCTA><PrimaryButton onClick={next} disabled={answers.goals.length === 0}>Build my Sprint</PrimaryButton></StickyCTA>
             </>
           )}
-          {stepId === "ai-personalising" && <AIPersonalising onDone={next} />}
+          {stepId === "ai-personalising" && <AIPersonalising answers={answers} onDone={(a) => { setAnswers((prev) => ({ ...prev, analysis: a })); next(); }} />}
           {stepId === "labour-market" && <LabourMarket onNext={next} />}
           {stepId === "methodology" && <Methodology onNext={next} />}
           {stepId === "motivation" && <Motivation onNext={next} />}
           {stepId === "offer" && <Offer onNext={next} />}
           {stepId === "social-proof" && <SocialProof onNext={next} />}
           {stepId === "account" && <Account answers={answers} setAnswers={setAnswers} onNext={next} />}
-          {stepId === "payment" && <Payment onPay={next} />}
+          {stepId === "payment" && <Payment email={answers.email} onExpire={() => { setAnswers({ ...DEFAULT_ANSWERS }); setIndex(STEPS.indexOf("account")); }} onPay={next} />}
         </motion.div>
       </AnimatePresence>
       {/* Footer brand mark */}
