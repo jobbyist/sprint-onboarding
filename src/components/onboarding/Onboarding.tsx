@@ -878,7 +878,7 @@ function Account({
         <div className="grid grid-cols-2 gap-3">
           <FormField label="First name" required>
             <input
-              className="w-full rounded-xl border border-border bg-background px-3 py-3 text-[15px] outline-none focus:border-primary"
+              className="w-full rounded-xl border border-border bg-background px-3 py-3 text-[15px] outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary/40"
               value={answers.firstName ?? ""}
               onChange={(e) => setAnswers({ ...answers, firstName: e.target.value })}
               autoComplete="given-name"
@@ -886,7 +886,7 @@ function Account({
           </FormField>
           <FormField label="Last name" required>
             <input
-              className="w-full rounded-xl border border-border bg-background px-3 py-3 text-[15px] outline-none focus:border-primary"
+              className="w-full rounded-xl border border-border bg-background px-3 py-3 text-[15px] outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary/40"
               value={answers.lastName ?? ""}
               onChange={(e) => setAnswers({ ...answers, lastName: e.target.value })}
               autoComplete="family-name"
@@ -896,7 +896,7 @@ function Account({
         <FormField label="Email" required error={touched && !!answers.email && !/\S+@\S+\.\S+/.test(answers.email) ? "Enter a valid email" : undefined}>
           <input
             type="email"
-            className="w-full rounded-xl border border-border bg-background px-3 py-3 text-[15px] outline-none focus:border-primary"
+            className="w-full rounded-xl border border-border bg-background px-3 py-3 text-[15px] outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary/40"
             value={answers.email ?? ""}
             onChange={(e) => setAnswers({ ...answers, email: e.target.value })}
             autoComplete="email"
@@ -905,7 +905,7 @@ function Account({
         <FormField label="Password" required hint="Minimum 8 characters">
           <input
             type="password"
-            className="w-full rounded-xl border border-border bg-background px-3 py-3 text-[15px] outline-none focus:border-primary"
+            className="w-full rounded-xl border border-border bg-background px-3 py-3 text-[15px] outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary/40"
             value={answers.password ?? ""}
             onChange={(e) => setAnswers({ ...answers, password: e.target.value })}
             autoComplete="new-password"
