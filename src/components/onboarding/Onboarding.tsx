@@ -23,6 +23,7 @@ type Answers = {
   lastName?: string;
   email?: string;
   password?: string;
+  analysis?: SprintAnalysis;
 };
 
 const DEFAULT_ANSWERS: Answers = {
