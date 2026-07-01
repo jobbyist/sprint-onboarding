@@ -36,12 +36,12 @@ export const generateSprintAnalysis = createServerFn({ method: "POST" })
     }
     try {
       const gateway = createLovableAiGatewayProvider(key);
-      const { experimental_output } = await generateText({
+      const { output } = await generateText({
         model: gateway("google/gemini-3-flash-preview"),
-        experimental_output: Output.object({ schema: AnalysisSchema }),
+        output: Output.object({ schema: AnalysisSchema }),
         prompt: buildPrompt(data),
       });
-      return experimental_output;
+      return output as SprintAnalysis;
     } catch (err) {
       console.error("[sprint-analysis] gateway error", err);
       return fallback(data);
