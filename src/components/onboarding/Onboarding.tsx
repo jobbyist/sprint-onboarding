@@ -333,7 +333,7 @@ function Welcome({ onStart }: { onStart: () => void }) {
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background">
       <header className="px-5 pt-5 sm:px-6">
-        <img src="https://sprint.jobbist.co.za/jobbyistlogoblack.png" width="150px" height="auto" className="h-6 w-auto dark:invert" />
+        <img src="https://sprint.jobbyist.co.za/jobbyistlogoblack.png" width="150px" height="auto" className="h-6 w-auto dark:invert" />
       </header>
       <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center px-5 pb-32 pt-6 text-center sm:px-6">
         <motion.div
@@ -1383,7 +1383,7 @@ export function Onboarding() {
       </AnimatePresence>
       {/* Footer brand mark */}
       <div className="mt-10 flex flex-col items-center gap-3 opacity-70">
-        <img src="https://sprint.jobbist.co.za/sprintlogo.png" width="150px" height="auto" alt="The 90-Day Job Search Sprint" className="h-8 w-auto dark:invert" />
+        <img src="https://sprint.jobbyist.co.za/sprintlogo.png" width="150px" height="auto" alt="The 90-Day Job Search Sprint" className="h-8 w-auto dark:invert" />
         <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Jobbyist South Africa · All rights reserved</p>
       </div>
     </StepShell>
